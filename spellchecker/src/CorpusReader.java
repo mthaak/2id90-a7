@@ -80,6 +80,10 @@ public class CorpusReader
         }
     }
     
+    public Set<String> getVocabulary(){
+        return this.vocabulary;
+    }
+    
     /**
      * Returns the size of the number of unique words in the dataset
      * 
