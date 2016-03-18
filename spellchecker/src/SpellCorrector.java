@@ -54,7 +54,14 @@ public class SpellCorrector {
 
     /**
      * Returns a map with candidate words and their noisy channel probability.
+     * @param prevWord
+     * @param word
+     * @param nextWord
+     * @return 
      */
+    
+    // WHY DID YOU ADD prevWord and nextWord??
+    
     public Map<String, Double> getCandidateWords(String prevWord, String word, String nextWord) {
         Map<String, Double> candidateWords = new HashMap<>();
         Set<String> similarWords = getSimilarWords(word);
@@ -74,15 +81,17 @@ public class SpellCorrector {
         
         Set<String> similarWords = new HashSet<String>();
         for (String word: vocabulary){
-            if (getDMDistance(inputWord, word) <= 1) similarWords.add(word);
+            if (getDMDistance(inputWord, word) <= 1) {
+                similarWords.add(word);
+            }
         }
 
         return similarWords;
     }
 
     /**
-     * Returns the Damerau-Levenshtein distance between strings a and b. Makes
-     * use of dynamic programming.
+     * Returns the Damerau-Levenshtein distance between strings a and b. 
+     * Makes use of the dynamic programming algorithm.
      */
     private int getDMDistance(String a, String b) {
         if (a.length() == 0) {
@@ -106,20 +115,14 @@ public class SpellCorrector {
         // fill in the rest
         for (int i = 1; i <= b.length(); i++) {
             for (int j = 1; j <= a.length(); j++) {
-                if (b.charAt(i - 1) == a.charAt(j - 1)) {
-                    m[i][j] = m[i - 1][j - 1];
-                } else if (i > 1 && j > 1 && 
-                        b.charAt(i - 1) == a.charAt(j - 2) && 
-                        b.charAt(i - 2) == a.charAt(j - 1)) {
-                    m[i][j] = Math.min(m[i][j - 1] + 1,         // insertion
-                              Math.min(m[i - 1][j] + 1,         // deletion
-                              Math.min(m[i - 1][j - 1] + 1,     // substitution
-                                       m[i - 2][j - 2] + 1)));  // transposition 
-                } else {
-                    m[i][j] = Math.min(m[i][j - 1] + 1,         // insertion
-                              Math.min(m[i - 1][j] + 1,         // deletion
-                                       m[i - 1][j - 1] + 1));   // substitution
+                int distanceToStringWithLengthMinusOne = 0;
+                if (b.charAt(i - 1) != a.charAt(j - 1)) {
+                    distanceToStringWithLengthMinusOne = 2;
                 }
+                    
+                m[i][j] = Math.min(m[i][j - 1] + 1,
+                        Math.min(m[i - 1][j] + 1, 
+                                m[i][j]) + distanceToStringWithLengthMinusOne); 
                 
                 // if distance is already larger than 1, prune;
 //                if (m[i][j] > 1) return 2;
