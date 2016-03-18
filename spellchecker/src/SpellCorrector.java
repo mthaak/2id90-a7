@@ -30,11 +30,11 @@ public class SpellCorrector {
             String prevWord = i > 0 ? words[i - 1] : "";
             String word = words[i];
             String nextWord = i < words.length - 1 ? words[i + 1] : "";
-            Map<String, Double> candidateWords = getCandidateWords(prevWord, word, nextWord);
+            Map<String, Integer> candidateWords = getCandidateWords(prevWord, word, nextWord);
 
             // Find best candidate
-            Entry<String, Double> bestCandidate = null;
-            for (Entry<String, Double> candidateWord : candidateWords.entrySet()) {
+            Entry<String, Integer> bestCandidate = null;
+            for (Entry<String, Integer> candidateWord : candidateWords.entrySet()) {
                 if (bestCandidate == null || candidateWord.getValue() > bestCandidate.getValue()) {
                     bestCandidate = candidateWord;
                 }
@@ -62,11 +62,13 @@ public class SpellCorrector {
     
     // WHY DID YOU ADD prevWord and nextWord??
     
-    public Map<String, Double> getCandidateWords(String prevWord, String word, String nextWord) {
-        Map<String, Double> candidateWords = new HashMap<>();
+    public Map<String, Integer> getCandidateWords(String prevWord, String word, String nextWord) {
+        Map<String, Integer> candidateWords = new HashMap<>();
         Set<String> similarWords = getSimilarWords(word);
         for (String similarWord : similarWords) {
-            candidateWords.put(similarWord, 0.1); // for now use equal probability
+            int probability = cr.getNGramCount(similarWord);
+            
+            candidateWords.put(similarWord, probability); // for now use equal probability
         }
         
         return candidateWords;
@@ -82,6 +84,7 @@ public class SpellCorrector {
         Set<String> similarWords = new HashSet<String>();
         for (String word: vocabulary){
             if (getDMDistance(inputWord, word) <= 1) {
+                System.out.println(word);
                 similarWords.add(word);
             }
         }
@@ -119,16 +122,16 @@ public class SpellCorrector {
                 if (b.charAt(i - 1) != a.charAt(j - 1)) {
                     distanceToStringWithLengthMinusOne = 2;
                 }
-                    
+                
                 m[i][j] = Math.min(m[i][j - 1] + 1,
                         Math.min(m[i - 1][j] + 1, 
-                                m[i][j]) + distanceToStringWithLengthMinusOne); 
+                                m[i - 1][j - 1] + distanceToStringWithLengthMinusOne)); 
                 
                 // if distance is already larger than 1, prune;
 //                if (m[i][j] > 1) return 2;
             }
         }
-
+        
         return m[b.length()][a.length()];
     }
 }
