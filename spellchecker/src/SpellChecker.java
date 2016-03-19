@@ -17,6 +17,7 @@ public class SpellChecker {
             CorpusReader cr = new CorpusReader();
             ConfusionMatrixReader cmr = new ConfusionMatrixReader();
             SpellCorrector sc = new SpellCorrector(cr, cmr);
+            
             if (inPeach) {
                 peachTest(sc);
             } else {
@@ -30,7 +31,8 @@ public class SpellChecker {
     
     static void nonPeachTest(SpellCorrector sc) throws IOException { 
             String[] sentences = {
-                "this assay allowed us to measure a wide variety of conditions" ,
+                "this essay"
+                /*"this assay allowed us to measure a wide variety of conditions" ,
                 "this assay allowed us to measure a wide variety of conitions" ,
                 "this assay allowed us to meassure a wide variety of conditions" ,
                 "this assay allowed us to measure a wide vareity of conditions" ,
@@ -41,7 +43,7 @@ public class SpellChecker {
                 "the development of diabetes is present in mice that carry a transgen" ,
                 "the development of diabetes is present in moce that carry a transgen" ,
                 "the development of idabetes is present in mice that carry a transgen" ,
-                "the development of diabetes us present in mice that harry a transgen"
+                "the development of diabetes us present in mice that harry a transgen"*/
             };
             
             for(String s0: sentences) {

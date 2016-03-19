@@ -119,10 +119,19 @@ public class CorpusReader
             throw new IllegalArgumentException("NGram must be non-empty.");
         }
         
-        double smoothedCount = 0.0;
+        double countTwoWords = getNGramCount(NGram);
         
-        /** ADD CODE HERE **/
+        String secondWord = ""; 
+        if (NGram.split(" ").length == 1) {
+            secondWord = NGram.split(" ")[2];
+        } else {
+            secondWord = NGram.split(" ")[1];
+        }
+        double countSecondWord = getNGramCount(secondWord);
         
+        double V = getVocabularySize(); // TODO how to get V?
+        System.out.println(V + " " + secondWord + " " + countSecondWord + " " + countTwoWords);
+        double smoothedCount = (countTwoWords + 1) / (countSecondWord + V);
         
         return smoothedCount;        
     }

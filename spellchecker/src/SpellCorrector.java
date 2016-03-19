@@ -17,6 +17,9 @@ public class SpellCorrector {
         this.cmr = cmr;
     }
 
+    final private int LAMBDA = 3;
+    final private double SCALE_FACTOR = Math.pow(10, 19);
+    
     public String correctPhrase(String phrase) {
         if (phrase == null || phrase.length() == 0) {
             throw new IllegalArgumentException("phrase must be non-empty.");
@@ -30,11 +33,11 @@ public class SpellCorrector {
             String prevWord = i > 0 ? words[i - 1] : "";
             String word = words[i];
             String nextWord = i < words.length - 1 ? words[i + 1] : "";
-            Map<String, Integer> candidateWords = getCandidateWords(prevWord, word, nextWord);
+            Map<String, Double> candidateWords = getCandidateWords(prevWord, word, nextWord);
 
             // Find best candidate
-            Entry<String, Integer> bestCandidate = null;
-            for (Entry<String, Integer> candidateWord : candidateWords.entrySet()) {
+            Entry<String, Double> bestCandidate = null;
+            for (Entry<String, Double> candidateWord : candidateWords.entrySet()) {
                 if (bestCandidate == null || candidateWord.getValue() > bestCandidate.getValue()) {
                     bestCandidate = candidateWord;
                 }
@@ -48,7 +51,7 @@ public class SpellCorrector {
         }
 
         String finalSuggestion = String.join(" ", finalWords);
-
+        
         return finalSuggestion.trim();
     }
 
@@ -62,13 +65,34 @@ public class SpellCorrector {
     
     // WHY DID YOU ADD prevWord and nextWord??
     
-    public Map<String, Integer> getCandidateWords(String prevWord, String word, String nextWord) {
-        Map<String, Integer> candidateWords = new HashMap<>();
+    public Map<String, Double> getCandidateWords(String prevWord, String word, String nextWord) {
+        Map<String, Double> candidateWords = new HashMap<>();
         Set<String> similarWords = getSimilarWords(word);
         for (String similarWord : similarWords) {
-            int probability = cr.getNGramCount(similarWord);
             
-            candidateWords.put(similarWord, probability); // for now use equal probability
+            /*HashSet<String> h = new HashSet<>();
+            h.add(prevWord);
+            h.add(similarWord);
+            
+            HashSet<String> g = new HashSet<>();
+            g = cr.inVocabulary(h);
+            
+            if (h.contains(g)) {
+                // ok?
+            }
+            
+            //int probability = cr.getNGramCount(similarWord);
+            */
+            
+            //double probability = cr.getSmoothedCount(prevWord + " " + similarWord);
+            
+            double value = cr.getSmoothedCount(prevWord + " " + similarWord);
+            double wordValue = cr.getSmoothedCount(" " + similarWord);
+            double channelValue = value * Math.pow(wordValue, LAMBDA) * SCALE_FACTOR;
+            
+            System.out.println(similarWord + " " + channelValue);
+            
+            candidateWords.put(similarWord, channelValue); // for now use equal probability
         }
         
         return candidateWords;
@@ -84,7 +108,6 @@ public class SpellCorrector {
         Set<String> similarWords = new HashSet<String>();
         for (String word: vocabulary){
             if (getDMDistance(inputWord, word) <= 1) {
-                System.out.println(word);
                 similarWords.add(word);
             }
         }
@@ -104,7 +127,7 @@ public class SpellCorrector {
             return a.length();
         }
 
-        // matrix
+        // initialize matrix
         int[][] m = new int[b.length()+1][a.length()+1];
 
         // fill in initial values
@@ -120,15 +143,12 @@ public class SpellCorrector {
             for (int j = 1; j <= a.length(); j++) {
                 int distanceToStringWithLengthMinusOne = 0;
                 if (b.charAt(i - 1) != a.charAt(j - 1)) {
-                    distanceToStringWithLengthMinusOne = 2;
+                    distanceToStringWithLengthMinusOne = 1;
                 }
                 
                 m[i][j] = Math.min(m[i][j - 1] + 1,
                         Math.min(m[i - 1][j] + 1, 
                                 m[i - 1][j - 1] + distanceToStringWithLengthMinusOne)); 
-                
-                // if distance is already larger than 1, prune;
-//                if (m[i][j] > 1) return 2;
             }
         }
         
