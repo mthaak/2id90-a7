@@ -26,13 +26,16 @@ public class SpellCorrector {
         }
 
         String[] words = phrase.split(" ");
+        String[] finalWords = phrase.split(" ");
+        String[] replacementsWords = new String[words.length];
 
-        String[] finalWords = new String[words.length];
+        Map<String,Double> bestWords = new HashMap<>();
+        
         for (int i = 0; i < words.length; i++) {
             // Find all candidate words
-            String prevWord = i > 0 ? words[i - 1] : "";
+            String prevWord = i > 0 ? words[i - 1] : "<s>";
             String word = words[i];
-            String nextWord = i < words.length - 1 ? words[i + 1] : "";
+            String nextWord = i < words.length - 1 ? words[i + 1] : "</s>";
             Map<String, Double> candidateWords = getCandidateWords(prevWord, word, nextWord);
 
             // Find best candidate
@@ -44,10 +47,64 @@ public class SpellCorrector {
             }
             
             if (bestCandidate == null) {
-                finalWords[i] = word;
+                bestWords.put(word, 0.0);
+                replacementsWords[i] = word;
             } else {
-                finalWords[i] = bestCandidate.getKey();
-            }            
+                bestWords.put(bestCandidate.getKey(), bestCandidate.getValue());
+                replacementsWords[i] = bestCandidate.getKey();
+            }
+        }
+        
+        // initialize places which can still be changed
+        Boolean[] possiblePositions = new Boolean[words.length];
+        for (int i = 0; i < words.length; i++) {
+            possiblePositions[i] = true;
+        }
+        
+        // replace max 2 words with heighest count (not consecutive!)
+        for (int i = 0; i < 3; i++) {
+            Entry<String, Double> bestWord = null;
+            int index = -1;
+            for (Entry<String, Double> word : bestWords.entrySet()) {
+                
+                boolean stop = false;
+                int index2 = -1;
+                
+                for (int j = 0; j < replacementsWords.length; j++) {
+                    if (replacementsWords[j].equals(word.getKey())){
+                        
+                        if (possiblePositions[j] == false) {
+                            stop = true;
+                        }
+                        
+                        index2 = j;
+                        break;
+                    }
+                }
+                
+                if (!stop) {
+                    if (bestWord == null || word.getValue() > bestWord.getValue()) {
+                        bestWord = word; 
+                        index = index2;
+                    }
+                }
+            }
+            
+            // replace
+            if (index != -1 ) {
+                possiblePositions[index] = false;
+                if (index - 1 >= 0) {
+                    possiblePositions[index-1] = false;
+                }
+                if (index + 1 <= words.length) {
+                    possiblePositions[index+1] = false;
+                }
+                finalWords[index] = replacementsWords[index];
+            }
+        }
+        
+        for (int i =0 ; i < replacementsWords.length; i++) {
+            System.out.println("best candidate words: " + replacementsWords[i]);
         }
 
         String finalSuggestion = String.join(" ", finalWords);
@@ -63,36 +120,23 @@ public class SpellCorrector {
      * @return 
      */
     
-    // WHY DID YOU ADD prevWord and nextWord??
-    
     public Map<String, Double> getCandidateWords(String prevWord, String word, String nextWord) {
         Map<String, Double> candidateWords = new HashMap<>();
         Set<String> similarWords = getSimilarWords(word);
         for (String similarWord : similarWords) {
+            double prevValue = cr.getSmoothedCount(prevWord, similarWord); // P(wi-1 | wi)
+            double nextValue = cr.getSmoothedCount(similarWord, nextWord); // P(wi | wi+1)
             
-            /*HashSet<String> h = new HashSet<>();
-            h.add(prevWord);
-            h.add(similarWord);
+            double similarWordValue = cr.getCountTest(similarWord);
+            double wordValue = cr.getCountTest(word);
+            double confusionValue = cr.getConfusionValue(similarWord, word); // TODO
             
-            HashSet<String> g = new HashSet<>();
-            g = cr.inVocabulary(h);
+            double channelValue = wordValue * Math.pow(confusionValue, LAMBDA) / similarWordValue; // P(x|w)
+            //channelValue *= SCALE_FACTOR;
             
-            if (h.contains(g)) {
-                // ok?
-            }
+            double chance = channelValue * prevValue * nextValue; // P(x|w) * P(wi-1|wi) * P(wi+1|wi)
             
-            //int probability = cr.getNGramCount(similarWord);
-            */
-            
-            //double probability = cr.getSmoothedCount(prevWord + " " + similarWord);
-            
-            double value = cr.getSmoothedCount(prevWord + " " + similarWord);
-            double wordValue = cr.getSmoothedCount(" " + similarWord);
-            double channelValue = value * Math.pow(wordValue, LAMBDA) * SCALE_FACTOR;
-            
-            System.out.println(similarWord + " " + channelValue);
-            
-            candidateWords.put(similarWord, channelValue); // for now use equal probability
+            candidateWords.put(similarWord, chance); // for now use equal probability
         }
         
         return candidateWords;
@@ -105,9 +149,9 @@ public class SpellCorrector {
     private Set<String> getSimilarWords(String inputWord) {
         Set<String> vocabulary = this.cr.getVocabulary();
         
-        Set<String> similarWords = new HashSet<String>();
+        Set<String> similarWords = new HashSet<>();
         for (String word: vocabulary){
-            if (getDMDistance(inputWord, word) <= 1) {
+            if (getDMDistance(inputWord, word) == 1) {
                 similarWords.add(word);
             }
         }

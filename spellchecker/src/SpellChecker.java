@@ -31,9 +31,8 @@ public class SpellChecker {
     
     static void nonPeachTest(SpellCorrector sc) throws IOException { 
             String[] sentences = {
-                "this essay"
-                /*"this assay allowed us to measure a wide variety of conditions" ,
-                "this assay allowed us to measure a wide variety of conitions" ,
+                "this assay allowed us to measure a wide variety of conditions" ,
+                /*"this assay allowed us to measure a wide variety of conitions" ,
                 "this assay allowed us to meassure a wide variety of conditions" ,
                 "this assay allowed us to measure a wide vareity of conditions" ,
                 "at the home locations there were traces of water" ,
