@@ -166,7 +166,7 @@ public class CorpusReader
         return smoothedCount;        
     }
     
-    public double getCountTest(String NGram) {
+    public double getWordValue(String NGram) {
         if(NGram == null || NGram.length() == 0)
         {
             throw new IllegalArgumentException("NGram must be non-empty.");
@@ -190,10 +190,12 @@ public class CorpusReader
         candidateX = " " + candidateX;
         wordW = " " + wordW;
         
-        //System.out.println(candidateX);
-        //System.out.println(wordW);
-        
         double value = -100;
+        
+        //TODO!!
+        if (candidateX.equals(wordW)) {
+            return 100;
+        }
         
         if (wordW.length() < candidateX.length()) {
             wordW = wordW + " ";
@@ -257,7 +259,7 @@ public class CorpusReader
                 }
                 
                 value = intValue;
-                return value;
+                return value; //TODO How to normalize!
             }
         }
         

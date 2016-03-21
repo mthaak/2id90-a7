@@ -18,8 +18,9 @@ public class SpellCorrector {
         this.cmr = cmr;
     }
 
-    final private int LAMBDA = 3;
-    final private double SCALE_FACTOR = Math.pow(10, 19);
+    final private int LAMBDA = 7;
+    //final private double SCALE_FACTOR = Math.pow(10, 19);
+    private final double NO_ERROR = 0.95;
 
     public String correctPhrase(String phrase) {
         if (phrase == null || phrase.length() == 0) {
@@ -33,14 +34,56 @@ public class SpellCorrector {
 
         List<String> possiblePhrases = getPossiblePhrases(words, similarWordsPerWord, 2, false);
 
-        System.out.println("Possible phrases: ");
-        possiblePhrases.forEach(sen -> System.out.println(sen));
-
-//        String finalSuggestion = String.join(" ", finalWords);
-        String finalSuggestion = "";
-
-        return finalSuggestion.trim();
+        double bestProbability = 0.0;
+        String bestSentence = "";
+        
+        for (String sentence : possiblePhrases) {
+            double probability = calculateProbabilityForSentence(sentence,phrase);
+            if (probability > bestProbability) {
+                bestProbability = probability;
+                bestSentence = sentence;
+            }
+        }
+        
+        return bestSentence;
     }
+
+    private double calculateProbabilityForSentence(String sentence, String originalSentence) {
+        String[] words = sentence.split(" ");
+        String[] originalWords = originalSentence.split(" ");
+        
+        // How to do confusionValue?
+        // How to no_error
+        
+        double probability = 0.0;
+        
+        for (int i = 0; i < words.length; i++) {
+            String prevWord = i > 0 ? words[i - 1] : "<s>";
+            String word = words[i];
+            String originalWord = originalWords[i];
+            String nextWord = i < words.length - 1 ? words[i + 1] : "</s>";
+            
+            double prevValue = cr.getSmoothedCount(prevWord, word);
+            double nextValue = cr.getSmoothedCount(word, nextWord);
+            
+            double wordValue = cr.getWordValue(word);
+            double originalWordValue = cr.getWordValue(originalWord);
+            double confusionValue = cr.getConfusionValue(word, originalWord);
+            
+            double channelValue = originalWordValue * Math.pow(confusionValue, LAMBDA) / wordValue;
+            
+            if (word.equals(originalWord)) {
+                channelValue = NO_ERROR;
+            } else {
+                channelValue *= (1 - NO_ERROR);
+            }
+            
+            double chance = channelValue * prevValue * nextValue;  
+            probability += chance;
+        }
+        return probability;
+    }
+    
 
     /**
      * Returns list of all possible corrected phrases for {@code phrase}. At
@@ -55,10 +98,11 @@ public class SpellCorrector {
 
         // STEP
         String firstWord = phrase.get(0);
+        //System.out.println("firstWord: " + firstWord + ", phrase: " + phrase.toString());
         return similarWords.get(firstWord).stream()
                 .filter(similarWord -> similarWord.equals(firstWord) || (correctionsLeft > 0 && !prevWasCorrection))
                 .flatMap(similarWord -> {
-                    List<String> remainingPhrase = phrase.size() > 1 ? phrase.subList(1, phrase.size() - 1) : new ArrayList<>();
+                    List<String> remainingPhrase = phrase.size() > 1 ? phrase.subList(1, phrase.size()) : new ArrayList<>();
 
                     List<String> possiblePhrases;
                     if (similarWord.equals(firstWord)) { // is same word
