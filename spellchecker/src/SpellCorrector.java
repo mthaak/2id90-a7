@@ -1,9 +1,10 @@
 
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class SpellCorrector {
 
@@ -19,127 +20,57 @@ public class SpellCorrector {
 
     final private int LAMBDA = 3;
     final private double SCALE_FACTOR = Math.pow(10, 19);
-    
+
     public String correctPhrase(String phrase) {
         if (phrase == null || phrase.length() == 0) {
             throw new IllegalArgumentException("phrase must be non-empty.");
         }
 
-        String[] words = phrase.split(" ");
-        String[] finalWords = phrase.split(" ");
-        String[] replacementsWords = new String[words.length];
+        List<String> words = Arrays.asList(phrase.split(" "));
+        
+        Map<String, Set<String>> similarWordsPerWord = words.stream()
+                .collect(Collectors.toMap(word -> word, word -> getSimilarWords(word)));
 
-        Map<String,Double> bestWords = new HashMap<>();
-        
-        for (int i = 0; i < words.length; i++) {
-            // Find all candidate words
-            String prevWord = i > 0 ? words[i - 1] : "<s>";
-            String word = words[i];
-            String nextWord = i < words.length - 1 ? words[i + 1] : "</s>";
-            Map<String, Double> candidateWords = getCandidateWords(prevWord, word, nextWord);
+        List<String> possiblePhrases = getPossiblePhrases(words, similarWordsPerWord, 2, false);
 
-            // Find best candidate
-            Entry<String, Double> bestCandidate = null;
-            for (Entry<String, Double> candidateWord : candidateWords.entrySet()) {
-                if (bestCandidate == null || candidateWord.getValue() > bestCandidate.getValue()) {
-                    bestCandidate = candidateWord;
-                }
-            }
-            
-            if (bestCandidate == null) {
-                bestWords.put(word, 0.0);
-                replacementsWords[i] = word;
-            } else {
-                bestWords.put(bestCandidate.getKey(), bestCandidate.getValue());
-                replacementsWords[i] = bestCandidate.getKey();
-            }
-        }
-        
-        // initialize places which can still be changed
-        Boolean[] possiblePositions = new Boolean[words.length];
-        for (int i = 0; i < words.length; i++) {
-            possiblePositions[i] = true;
-        }
-        
-        // replace max 2 words with heighest count (not consecutive!)
-        for (int i = 0; i < 3; i++) {
-            Entry<String, Double> bestWord = null;
-            int index = -1;
-            for (Entry<String, Double> word : bestWords.entrySet()) {
-                
-                boolean stop = false;
-                int index2 = -1;
-                
-                for (int j = 0; j < replacementsWords.length; j++) {
-                    if (replacementsWords[j].equals(word.getKey())){
-                        
-                        if (possiblePositions[j] == false) {
-                            stop = true;
-                        }
-                        
-                        index2 = j;
-                        break;
-                    }
-                }
-                
-                if (!stop) {
-                    if (bestWord == null || word.getValue() > bestWord.getValue()) {
-                        bestWord = word; 
-                        index = index2;
-                    }
-                }
-            }
-            
-            // replace
-            if (index != -1 ) {
-                possiblePositions[index] = false;
-                if (index - 1 >= 0) {
-                    possiblePositions[index-1] = false;
-                }
-                if (index + 1 <= words.length) {
-                    possiblePositions[index+1] = false;
-                }
-                finalWords[index] = replacementsWords[index];
-            }
-        }
-        
-        for (int i =0 ; i < replacementsWords.length; i++) {
-            System.out.println("best candidate words: " + replacementsWords[i]);
-        }
+        System.out.println("Possible phrases: ");
+        possiblePhrases.forEach(sen -> System.out.println(sen));
 
-        String finalSuggestion = String.join(" ", finalWords);
-        
+//        String finalSuggestion = String.join(" ", finalWords);
+        String finalSuggestion = "";
+
         return finalSuggestion.trim();
     }
 
     /**
-     * Returns a map with candidate words and their noisy channel probability.
-     * @param prevWord
-     * @param word
-     * @param nextWord
-     * @return 
+     * Returns list of all possible corrected phrases for {@code phrase}. At
+     * most two non-consecutive words in the phrase are be corrected.
      */
-    
-    public Map<String, Double> getCandidateWords(String prevWord, String word, String nextWord) {
-        Map<String, Double> candidateWords = new HashMap<>();
-        Set<String> similarWords = getSimilarWords(word);
-        for (String similarWord : similarWords) {
-            double prevValue = cr.getSmoothedCount(prevWord, similarWord); // P(wi-1 | wi)
-            double nextValue = cr.getSmoothedCount(similarWord, nextWord); // P(wi | wi+1)
-            
-            double similarWordValue = cr.getCountTest(similarWord);
-            double wordValue = cr.getCountTest(word);
-            double confusionValue = cr.getConfusionValue(similarWord, word); // TODO
-            
-            double channelValue = wordValue * Math.pow(confusionValue, LAMBDA) / similarWordValue; // P(x|w)
-            //channelValue *= SCALE_FACTOR;
-            
-            double chance = channelValue * prevValue * nextValue; // P(x|w) * P(wi-1|wi) * P(wi+1|wi)
-            
-            candidateWords.put(similarWord, chance); // for now use equal probability
+    private List<String> getPossiblePhrases(List<String> phrase, Map<String, Set<String>> similarWords,
+            int correctionsLeft, boolean prevWasCorrection) {
+        // BASE
+        if (phrase.isEmpty()) {
+            return Arrays.asList("");
         }
-        
-        return candidateWords;
+
+        // STEP
+        String firstWord = phrase.get(0);
+        return similarWords.get(firstWord).stream()
+                .filter(similarWord -> similarWord.equals(firstWord) || (correctionsLeft > 0 && !prevWasCorrection))
+                .flatMap(similarWord -> {
+                    List<String> remainingPhrase = phrase.size() > 1 ? phrase.subList(1, phrase.size() - 1) : new ArrayList<>();
+
+                    List<String> possiblePhrases;
+                    if (similarWord.equals(firstWord)) { // is same word
+                        possiblePhrases = getPossiblePhrases(remainingPhrase, similarWords, correctionsLeft, false);
+                    } else { // is correction
+                        possiblePhrases = getPossiblePhrases(remainingPhrase, similarWords, correctionsLeft - 1, true);
+                    }
+
+                    return possiblePhrases.stream()
+                    .map(remPhrase -> similarWord + " " + String.join(" ", remPhrase));
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -147,23 +78,16 @@ public class SpellCorrector {
      * most 1 from inputWord.
      */
     private Set<String> getSimilarWords(String inputWord) {
-        Set<String> vocabulary = this.cr.getVocabulary();
-        
-        Set<String> similarWords = new HashSet<>();
-        for (String word: vocabulary){
-            if (getDMDistance(inputWord, word) == 1) {
-                similarWords.add(word);
-            }
-        }
-
-        return similarWords;
+        return this.cr.getVocabulary().stream()
+                .filter(word -> getDLDistance(inputWord, word) <= 1)
+                .collect(Collectors.toSet());
     }
 
     /**
-     * Returns the Damerau-Levenshtein distance between strings a and b. 
-     * Makes use of the dynamic programming algorithm.
+     * Returns the Damerau-Levenshtein distance between strings a and b. Makes
+     * use of the dynamic programming algorithm.
      */
-    private int getDMDistance(String a, String b) {
+    private int getDLDistance(String a, String b) {
         if (a.length() == 0) {
             return b.length();
         }
@@ -172,7 +96,7 @@ public class SpellCorrector {
         }
 
         // initialize matrix
-        int[][] m = new int[b.length()+1][a.length()+1];
+        int[][] m = new int[b.length() + 1][a.length() + 1];
 
         // fill in initial values
         for (int i = 0; i <= b.length(); i++) {
@@ -181,7 +105,7 @@ public class SpellCorrector {
         for (int j = 0; j <= a.length(); j++) {
             m[0][j] = j;
         }
-        
+
         // fill in the rest
         for (int i = 1; i <= b.length(); i++) {
             for (int j = 1; j <= a.length(); j++) {
@@ -201,7 +125,7 @@ public class SpellCorrector {
                 }
             }
         }
-        
+
         return m[b.length()][a.length()];
     }
 }
