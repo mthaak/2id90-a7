@@ -137,18 +137,24 @@ public class SpellCorrector {
         for (int j = 0; j <= a.length(); j++) {
             m[0][j] = j;
         }
-
+        
         // fill in the rest
         for (int i = 1; i <= b.length(); i++) {
             for (int j = 1; j <= a.length(); j++) {
-                int distanceToStringWithLengthMinusOne = 0;
-                if (b.charAt(i - 1) != a.charAt(j - 1)) {
-                    distanceToStringWithLengthMinusOne = 1;
+                if (b.charAt(i - 1) == a.charAt(j - 1)) {
+                    m[i][j] = m[i - 1][j - 1];
+                } else if (i > 1 && j > 1 && 
+                        b.charAt(i - 1) == a.charAt(j - 2) && 
+                        b.charAt(i - 2) == a.charAt(j - 1)) {
+                    m[i][j] = Math.min(m[i][j - 1] + 1,         // insertion
+                              Math.min(m[i - 1][j] + 1,         // deletion
+                              Math.min(m[i - 1][j - 1] + 1,     // substitution
+                                       m[i - 2][j - 2] + 1)));  // transposition 
+                } else {
+                    m[i][j] = Math.min(m[i][j - 1] + 1,         // insertion
+                              Math.min(m[i - 1][j] + 1,         // deletion
+                                       m[i - 1][j - 1] + 1));   // substitution
                 }
-                
-                m[i][j] = Math.min(m[i][j - 1] + 1,
-                        Math.min(m[i - 1][j] + 1, 
-                                m[i - 1][j - 1] + distanceToStringWithLengthMinusOne)); 
             }
         }
         
