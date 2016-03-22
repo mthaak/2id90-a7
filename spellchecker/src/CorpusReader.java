@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 
 public class CorpusReader 
@@ -85,11 +86,15 @@ public class CorpusReader
         }
     }
     
+    double stdDev = 0.0;
+    double average = 0.0;
+    
     private void readConfusionMatrix() throws FileNotFoundException, IOException {
         confusions = new HashMap<>();
         
         FileInputStream fis = new FileInputStream(CONFUSIONFILE_LOC);
         BufferedReader in = new BufferedReader(new InputStreamReader(fis));
+        
         
         while (in.ready()) {
             String phrase = in.readLine();//.trim();
@@ -107,6 +112,22 @@ public class CorpusReader
                 throw new NumberFormatException("NumberformatError: " + s1);
             }
         }
+        
+        double totalCount = 0.0;
+        double confusionCount = 0.0;
+        
+        for (Entry<String,Integer> confusion: confusions.entrySet()) {
+            totalCount += confusion.getValue();
+            confusionCount ++;
+        }
+        
+        average = totalCount / confusionCount;    
+        
+        for (Entry<String,Integer> confusion: confusions.entrySet()) {
+            stdDev = Math.pow((average - confusion.getValue()),2);
+        }
+        
+        stdDev *= (1/(confusionCount-1));
     }
     
     public Set<String> getVocabulary(){
@@ -141,6 +162,8 @@ public class CorpusReader
        return vocabulary.contains(word);
     }    
     
+    private final double K = 0.01;
+    
     public double getSmoothedCount(String word1, String word2)
     {
         if(word1 == null || word2 == null)
@@ -160,8 +183,8 @@ public class CorpusReader
             countSecondWord = getNGramCount(word2);
         }
         
-        double V = getVocabularySize(); // TODO how to get V?
-        double smoothedCount = (countTwoWords + 1) / (countSecondWord + V);
+        double V = getVocabularySize();
+        double smoothedCount = (countTwoWords + K) / (countSecondWord + K * V);
         
         return smoothedCount;        
     }
@@ -175,7 +198,11 @@ public class CorpusReader
         double count = getNGramCount(NGram);
         double V = getVocabularySize();
         
-        return count / V;
+        if (count == Double.NaN) {
+            count = 0.0;
+        }
+        
+        return (count + K) / (count + K * V);
     }
     
     
@@ -184,18 +211,12 @@ public class CorpusReader
     
     // transposition or substitution only if same length
     // insertion / deletion only if not same length
-    
     public double getConfusionValue(String candidateX, String wordW) {
         
         candidateX = " " + candidateX;
         wordW = " " + wordW;
         
         double value = -100;
-        
-        //TODO!!
-        if (candidateX.equals(wordW)) {
-            return 100;
-        }
         
         if (wordW.length() < candidateX.length()) {
             wordW = wordW + " ";
@@ -259,12 +280,21 @@ public class CorpusReader
                 }
                 
                 value = intValue;
+                
+                value = (value - average) / stdDev;
+                
                 return value; //TODO How to normalize!
             }
         }
         
         
         System.out.println("You do not want to arrive here, value: " + value + candidateX);
+        return value;
+    }
+    
+    public double getConfusionValue(String word, double value) {
+        value = (value - average) / stdDev;
+        
         return value;
     }
 }
