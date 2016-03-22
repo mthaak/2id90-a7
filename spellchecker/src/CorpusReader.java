@@ -86,8 +86,7 @@ public class CorpusReader
         }
     }
     
-    double stdDev = 0.0;
-    double average = 0.0;
+    double totalCount = 0.0;
     
     private void readConfusionMatrix() throws FileNotFoundException, IOException {
         confusions = new HashMap<>();
@@ -108,26 +107,11 @@ public class CorpusReader
             try {
                 count = Integer.parseInt(s2);
                 confusions.put(s1, count);
+                totalCount++;
             } catch (NumberFormatException nfe) {
                 throw new NumberFormatException("NumberformatError: " + s1);
             }
         }
-        
-        double totalCount = 0.0;
-        double confusionCount = 0.0;
-        
-        for (Entry<String,Integer> confusion: confusions.entrySet()) {
-            totalCount += confusion.getValue();
-            confusionCount ++;
-        }
-        
-        average = totalCount / confusionCount;    
-        
-        for (Entry<String,Integer> confusion: confusions.entrySet()) {
-            stdDev = Math.pow((average - confusion.getValue()),2);
-        }
-        
-        stdDev *= (1/(confusionCount-1));
     }
     
     public Set<String> getVocabulary(){
@@ -162,7 +146,7 @@ public class CorpusReader
        return vocabulary.contains(word);
     }    
     
-    private final double K = 0.01;
+    private final double K = 250;
     
     public double getSmoothedCount(String word1, String word2)
     {
@@ -187,6 +171,21 @@ public class CorpusReader
         double smoothedCount = (countTwoWords + K) / (countSecondWord + K * V);
         
         return smoothedCount;        
+    }
+    
+    public double getSmoothedGoodTuring(String word1, String word2){
+        int maxCount = 0;
+        for (Entry<String,Integer> entry : ngrams.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                maxCount = entry.getValue();
+            }
+        }
+        
+        int[] smoothedList = new int[maxCount];
+        for (int i = 0; i < maxCount; i++) {
+            //smoothedList[i] = (i+1) * 
+            // TODO
+        }
     }
     
     public double getWordValue(String NGram) {
@@ -259,8 +258,8 @@ public class CorpusReader
                             candidateX.charAt(i) == wordW.charAt(i+1)){
                         // transposition
                         
-                        badPart = candidateX.charAt(i) + candidateX.charAt(i+1) + "";
-                        goodPart = wordW.charAt(i) + wordW.charAt(i+1) + "";
+                        badPart = candidateX.charAt(i) + "" + candidateX.charAt(i+1) + "";
+                        goodPart = wordW.charAt(i) + "" + wordW.charAt(i+1) + "";
                         
                     } else {
                         // substitution
@@ -281,7 +280,7 @@ public class CorpusReader
                 
                 value = intValue;
                 
-                value = (value - average) / stdDev;
+                value /= totalCount;
                 
                 return value; //TODO How to normalize!
             }
@@ -289,12 +288,6 @@ public class CorpusReader
         
         
         System.out.println("You do not want to arrive here, value: " + value + candidateX);
-        return value;
-    }
-    
-    public double getConfusionValue(String word, double value) {
-        value = (value - average) / stdDev;
-        
         return value;
     }
 }

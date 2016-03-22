@@ -19,7 +19,7 @@ public class SpellCorrector {
         this.cmr = cmr;
     }
 
-    final private int LAMBDA = 3;
+    final private int LAMBDA = 4;
     //final private double SCALE_FACTOR = Math.pow(10, 19);
     private final double NO_ERROR = 0.97;
 
@@ -33,32 +33,16 @@ public class SpellCorrector {
         Map<String, Set<String>> similarWordsPerWord = words.stream()
                 .collect(Collectors.toMap(word -> word, word -> getSimilarWords(word)));
         
-        for (Entry<String,Set<String>> entry : similarWordsPerWord.entrySet()) {
-            Set<String> words1 = entry.getValue();
-            System.out.println("similarwords size of " + entry.getKey() + " value: " + words1.size());
-            /*for (String word : words1) {
-                System.out.println(word);
-            }*/
-        }
-
         List<String> possiblePhrases = getPossiblePhrases(words, similarWordsPerWord, 2, false);
         
-        System.out.println("Nr of possible phrases: " + possiblePhrases.size());
-        
-        //possiblePhrases.forEach(sen -> System.out.println(sen));
-        
-
-        double bestProbability = 0.0;
+        double bestProbability = Double.POSITIVE_INFINITY;
         String bestSentence = "";
         
         for (String sentence : possiblePhrases) {
-            //System.out.println(sentence);
             double probability = calculateProbabilityForSentence(sentence,phrase);
-            //System.out.println("probability: " + probability);
-            if (probability > bestProbability) {
+            if (probability <= bestProbability) {
                 bestProbability = probability;
                 bestSentence = sentence;
-                //System.out.println(sentence + " " + probability);
             }
         }
         
@@ -86,20 +70,18 @@ public class SpellCorrector {
             double wordValue = cr.getWordValue(word);
             double originalWordValue = cr.getWordValue(originalWord);
             
-            double channelValue = 0.0;
-                    
+            double channelValue;
+            double confusionValue =0.0;   
             if (word.equals(originalWord)) {
-                channelValue = Math.pow(cr.getConfusionValue(word, 500), LAMBDA);
-                channelValue *= NO_ERROR;
+                channelValue = NO_ERROR;
             } else {
-                double confusionValue = cr.getConfusionValue(word, originalWord);
+                confusionValue = cr.getConfusionValue(word, originalWord);
                 channelValue = wordValue * Math.pow(confusionValue, LAMBDA);// / originalWordValue;
-                channelValue *= (1 - NO_ERROR);
             }
             
-            double chance = channelValue * prevValue * nextValue;  
-            probability += chance;
-            //System.out.println("probability: " + probability);
+            double chance = channelValue * prevValue * nextValue; 
+            
+            probability -= Math.log(chance);
         }
         return probability;
     }
@@ -130,14 +112,6 @@ public class SpellCorrector {
                     } else { // is correction
                         possiblePhrases = getPossiblePhrases(remainingPhrase, similarWords, correctionsLeft - 1, true);
                     }
-                    
-                    if (firstWord.equals("mice")){
-                        System.out.println("mice");
-                                }
- 
-                    /*if (possiblePhrases.size()>0) {
-                        System.out.println(possiblePhrases.size());
-                    }*/
                     
                     return possiblePhrases.stream()
                     .map(remPhrase -> similarWord + " " + String.join(" ", remPhrase));
