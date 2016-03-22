@@ -1,53 +1,55 @@
+
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import static java.lang.Integer.max;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 
-public class CorpusReader 
-{
+public class CorpusReader {
+
     final static String CNTFILE_LOC = "samplecnt.txt";
     final static String VOCFILE_LOC = "samplevoc.txt";
     final static String CONFUSIONFILE_LOC = "confusion_matrix.txt";
-    
-    private HashMap<String,Integer> ngrams;
-    private HashMap<String,Integer> confusions;
+
+    private HashMap<String, Integer> ngrams;
+    private HashMap<String, Integer> confusions;
     private Set<String> vocabulary;
-        
-    public CorpusReader() throws IOException
-    {  
+
+    private HashMap<Integer, Integer> countFrequencies;
+    private int maxCount;
+    static final int K = 250;
+
+    public CorpusReader() throws IOException {
         readNGrams();
         readVocabulary();
         readConfusionMatrix();
     }
-    
+
     /**
      * Returns the n-gram count of <NGram> in the file
-     * 
-     * 
+     *
+     *
      * @param nGram : space-separated list of words, e.g. "adopted by him"
-     * @return 0 if <NGram> cannot be found, 
-     * otherwise count of <NGram> in file
+     * @return 0 if <NGram> cannot be found, otherwise count of <NGram> in file
      */
-     public int getNGramCount(String nGram) throws  NumberFormatException
-    {
-        if(nGram == null || nGram.length() == 0)
-        {
+    public int getNGramCount(String nGram) throws NumberFormatException {
+        if (nGram == null || nGram.length() == 0) {
             throw new IllegalArgumentException("NGram must be non-empty.");
         }
         Integer value = ngrams.get(nGram);
-        return value==null?0:value;
+        return value == null ? 0 : value;
     }
-    
-    private void readNGrams() throws 
-            FileNotFoundException, IOException, NumberFormatException
-    {
+
+    private void readNGrams() throws
+            FileNotFoundException, IOException, NumberFormatException {
         ngrams = new HashMap<>();
 
         FileInputStream fis;
@@ -71,30 +73,27 @@ public class CorpusReader
             }
         }
     }
-    
-    
+
     private void readVocabulary() throws FileNotFoundException, IOException {
         vocabulary = new HashSet<>();
-        
+
         FileInputStream fis = new FileInputStream(VOCFILE_LOC);
         BufferedReader in = new BufferedReader(new InputStreamReader(fis));
-        
-        while(in.ready())
-        {
+
+        while (in.ready()) {
             String line = in.readLine();
             vocabulary.add(line);
         }
     }
-    
+
     double totalCount = 0.0;
-    
+
     private void readConfusionMatrix() throws FileNotFoundException, IOException {
         confusions = new HashMap<>();
-        
+
         FileInputStream fis = new FileInputStream(CONFUSIONFILE_LOC);
         BufferedReader in = new BufferedReader(new InputStreamReader(fis));
-        
-        
+
         while (in.ready()) {
             String phrase = in.readLine();//.trim();
             String s1, s2;
@@ -113,181 +112,143 @@ public class CorpusReader
             }
         }
     }
-    
-    public Set<String> getVocabulary(){
+
+    public Set<String> getVocabulary() {
         return this.vocabulary;
     }
-    
+
     /**
      * Returns the size of the number of unique words in the dataset
-     * 
+     *
      * @return the size of the number of unique words in the dataset
      */
-    public int getVocabularySize() 
-    {
+    public int getVocabularySize() {
         return vocabulary.size();
     }
-    
+
     /**
      * Returns the subset of words in set that are in the vocabulary
-     * 
+     *
      * @param set
-     * @return 
+     * @return
      */
-    public HashSet<String> inVocabulary(Set<String> set) 
-    {
+    public HashSet<String> inVocabulary(Set<String> set) {
         HashSet<String> h = new HashSet<>(set);
         h.retainAll(vocabulary);
         return h;
     }
-    
-    public boolean inVocabulary(String word) 
-    {
-       return vocabulary.contains(word);
-    }    
-    
-    private final double K = 250;
-    
-    public double getSmoothedCount(String word1, String word2)
-    {
-        if(word1 == null || word2 == null)
-        {
+
+    public boolean inVocabulary(String word) {
+        return vocabulary.contains(word);
+    }
+
+    public void determineCountFrequencies() {
+        this.countFrequencies = new HashMap<>();
+
+        List<Integer> counts = new ArrayList<>(this.ngrams.values());
+        int i;
+        for (i = 1; counts.contains(i); i++) {
+            this.countFrequencies.put(i, Collections.frequency(counts, i));
+        }
+        this.maxCount = i;
+    }
+
+    public double getProbabilityGivenNext(String word, String nextWord) {
+        if (word == null || nextWord == null) {
             throw new IllegalArgumentException("NGram must be non-empty.");
         }
-        
-        double countTwoWords;
-        double countSecondWord = 0.0;
-        if (word1.equals("<s>")) {
-            countTwoWords = getNGramCount(word2);
-        } else if (word2.equals("</s>")) {
-            countTwoWords = getNGramCount(word1);
-            countSecondWord = 0.0;
-        } else {
-            countTwoWords = getNGramCount(word1 + " " + word2);
-            countSecondWord = getNGramCount(word2);
-        }
-        
+
+        double countBigram = getGoodTuringSmoothedCount(word + " " + nextWord);
+        int countNextWord = getNGramCount(nextWord);
         double V = getVocabularySize();
-        double smoothedCount = (countTwoWords + K) / (countSecondWord + K * V);
-        
-        return smoothedCount;        
+        double probability = (countBigram + K) / (countNextWord + K * V);
+
+        return probability;
     }
-    
-    public double getSmoothedGoodTuring(String word1, String word2){
-        int maxCount = 0;
-        for (Entry<String,Integer> entry : ngrams.entrySet()) {
-            if (entry.getValue() > maxCount) {
-                maxCount = entry.getValue();
+
+    public double getProbabiltyGivenPrev(String word, String prevWord) {
+        if (word == null || prevWord == null) {
+            throw new IllegalArgumentException("NGram must be non-empty.");
+        }
+
+        double countBigram = getGoodTuringSmoothedCount(prevWord + " " + word);
+        int countPrevWord = getNGramCount(prevWord);
+        double V = getVocabularySize();
+        double probability = (countBigram + K) / (countPrevWord + K * V);
+
+        return probability;
+    }
+
+    private int getGoodTuringSmoothedCount(String ngram) {
+        int N = this.ngrams.size();
+
+        if (!this.ngrams.containsKey(ngram) || this.ngrams.get(ngram) == 0) {
+            return this.countFrequencies.get(1) / N;
+        } else {
+            int c = this.ngrams.get(ngram);
+            if (c < this.maxCount) {
+                return (c + 1) * (this.countFrequencies.get(c + 1) / (this.countFrequencies.get(c) * N));
+            } else {
+                return c / N;
             }
         }
-        
-        int[] smoothedList = new int[maxCount];
-        for (int i = 0; i < maxCount; i++) {
-            //smoothedList[i] = (i+1) * 
-            // TODO
-        }
     }
-    
-    public double getWordValue(String NGram) {
-        if(NGram == null || NGram.length() == 0)
-        {
+
+    public double getProbability(String ngram) {
+        if (ngram == null || ngram.length() == 0) {
             throw new IllegalArgumentException("NGram must be non-empty.");
         }
-        
-        double count = getNGramCount(NGram);
+
+        double count = getNGramCount(ngram);
         double V = getVocabularySize();
-        
+
         if (count == Double.NaN) {
+            System.out.println("unknown: " + ngram);
             count = 0.0;
         }
-        
+
         return (count + K) / (count + K * V);
     }
-    
-    
-    // altered by at most
-    // 1 insertion, deletion, transposition or substitution
-    
-    // transposition or substitution only if same length
-    // insertion / deletion only if not same length
-    public double getConfusionValue(String candidateX, String wordW) {
-        
-        candidateX = " " + candidateX;
-        wordW = " " + wordW;
-        
-        double value = -100;
-        
-        if (wordW.length() < candidateX.length()) {
-            wordW = wordW + " ";
-        } else if (candidateX.length() < wordW.length()) {
-            candidateX = candidateX + " ";
-        }
-        
-        for (int i = 0; i < candidateX.length(); i++) {
-            if (candidateX.charAt(i) != wordW.charAt(i)) {
-                
-                String badPart;
-                String goodPart;
-                
-                // insertion / deletion
-                String lastX = candidateX.charAt(candidateX.length() - 1) + "";
-                String lastW = wordW.charAt(wordW.length() - 1) + "";
-                if (lastX.equals(" ") || lastW.equals(" ")) {
-                    
-                    if (candidateX.trim().length() > wordW.trim().length()) {
-                        // deletion
-                        badPart = candidateX.charAt(i-1) + "" + candidateX.charAt(i);
-                        goodPart = candidateX.charAt(i-1) + "";
-                        
-                    } else {
-                        // insertion
-                        //System.out.println("insertion");
-                        badPart = candidateX.charAt(i-1) + "";
-                        goodPart = candidateX.charAt(i-1) + "" + wordW.charAt(i);
+
+    public String getCorrection(String originalWord, String correctedWord) {
+        // Space is seen as character in the confusion matrix
+        originalWord = " " + originalWord;
+        correctedWord = " " + correctedWord;
+
+        int endIndex = max(originalWord.length(), correctedWord.length());
+        for (int i = 1; i < endIndex; i++) {
+            if ((i == endIndex - 1 && originalWord.length() != correctedWord.length())
+                    || originalWord.charAt(i) != correctedWord.charAt(i)) { // correction
+
+                if (originalWord.length() == correctedWord.length()) { // transposition or substitution
+
+                    if (i + 1 < originalWord.length() // transposition
+                            && originalWord.charAt(i + 1) != correctedWord.charAt(i + 1)) {
+                        return originalWord.substring(i, i + 2) + "|" + correctedWord.substring(i, i + 2);
+                    } else { // substitution
+                        return originalWord.substring(i, i + 1) + "|" + correctedWord.substring(i, i + 1);
                     }
-                } else {
-                    // transposition or substitution
-                    
-                    if (i == candidateX.length() - 1) {
-                        // substitution
-                        
-                        badPart = candidateX.charAt(i) + "";
-                        goodPart = wordW.charAt(i) + "";
-                        
-                    } else if (candidateX.charAt(i+1) == wordW.charAt(i) &&
-                            candidateX.charAt(i) == wordW.charAt(i+1)){
-                        // transposition
-                        
-                        badPart = candidateX.charAt(i) + "" + candidateX.charAt(i+1) + "";
-                        goodPart = wordW.charAt(i) + "" + wordW.charAt(i+1) + "";
-                        
-                    } else {
-                        // substitution
-                        
-                        badPart = candidateX.charAt(i) + "";
-                        goodPart = wordW.charAt(i) + "";
-                    }
-                    
+
+                } else if (originalWord.length() > correctedWord.length()) { // deletion
+                    return originalWord.substring(i - 1, i + 1) + "|" + correctedWord.substring(i - 1, i);
+                } else if (originalWord.length() < correctedWord.length()) { // insertion
+                    return originalWord.substring(i - 1, i) + "|" + correctedWord.substring(i - 1, i + 1);
                 }
-                
-                String concat = badPart + "|" + goodPart;
-                //System.out.println("concat: '" + concat + "'");
-                
-                Integer intValue = confusions.get(concat);
-                if (intValue == null) {
-                    intValue = 0;
-                }
-                
-                value = intValue;
-                
-                value /= totalCount;
-                
-                return value; //TODO How to normalize!
             }
         }
-        
-        
-        System.out.println("You do not want to arrive here, value: " + value + candidateX);
-        return value;
+
+        return ""; // doesn't matter
+    }
+
+    public double getConfusionValue(String originalWord, String correctedWord) {
+        if (originalWord.equals(correctedWord)) {
+            return 0.0;
+        }
+
+        String correction = getCorrection(originalWord, correctedWord);
+        Integer confusionValue = confusions.get(correction);
+
+        // TODO: normalize
+        return confusionValue != null ? confusionValue : 0;
     }
 }

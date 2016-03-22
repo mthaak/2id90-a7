@@ -1,26 +1,18 @@
-
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class SpellCorrector {
 
     final private CorpusReader cr;
-    final private ConfusionMatrixReader cmr;
-
-    final char[] ALPHABET = "abcdefghijklmnopqrstuvwxyz'".toCharArray();
 
     public SpellCorrector(CorpusReader cr, ConfusionMatrixReader cmr) {
         this.cr = cr;
-        this.cmr = cmr;
     }
 
     final private int LAMBDA = 4;
-    //final private double SCALE_FACTOR = Math.pow(10, 19);
     private final double NO_ERROR = 0.97;
 
     public String correctPhrase(String phrase) {
@@ -28,64 +20,64 @@ public class SpellCorrector {
             throw new IllegalArgumentException("phrase must be non-empty.");
         }
 
+        cr.determineCountFrequencies();
+
         List<String> words = Arrays.asList(phrase.split(" "));
-        
+
         Map<String, Set<String>> similarWordsPerWord = words.stream()
                 .collect(Collectors.toMap(word -> word, word -> getSimilarWords(word)));
-        
+
         List<String> possiblePhrases = getPossiblePhrases(words, similarWordsPerWord, 2, false);
-        
+
         double bestProbability = Double.POSITIVE_INFINITY;
         String bestSentence = "";
-        
+
         for (String sentence : possiblePhrases) {
-            double probability = calculateProbabilityForSentence(sentence,phrase);
+            double probability = calculateProbabilityForSentence(sentence, phrase);
             if (probability <= bestProbability) {
                 bestProbability = probability;
                 bestSentence = sentence;
             }
         }
-        
+
         return bestSentence;
     }
 
     private double calculateProbabilityForSentence(String sentence, String originalSentence) {
         String[] words = sentence.split(" ");
         String[] originalWords = originalSentence.split(" ");
-        
+
         // How to do confusionValue?
         // How to no_error
-        
         double probability = 0.0;
-        
+
         for (int i = 0; i < words.length; i++) {
             String prevWord = i > 0 ? words[i - 1] : "<s>";
             String word = words[i];
             String originalWord = originalWords[i];
             String nextWord = i < words.length - 1 ? words[i + 1] : "</s>";
-            
-            double prevValue = cr.getSmoothedCount(prevWord, word);
-            double nextValue = cr.getSmoothedCount(word, nextWord);
-            
-            double wordValue = cr.getWordValue(word);
-            double originalWordValue = cr.getWordValue(originalWord);
-            
+
+            double prevValue = cr.getProbabiltyGivenPrev(word, prevWord);
+            double nextValue = cr.getProbabilityGivenNext(word, nextWord);
+
+            double wordValue = cr.getProbability(word);
+            double originalWordValue = cr.getProbability(originalWord);
+
             double channelValue;
-            double confusionValue =0.0;   
+            double confusionValue = 0.0;
             if (word.equals(originalWord)) {
                 channelValue = NO_ERROR;
             } else {
                 confusionValue = cr.getConfusionValue(word, originalWord);
                 channelValue = wordValue * Math.pow(confusionValue, LAMBDA);// / originalWordValue;
             }
-            
-            double chance = channelValue * prevValue * nextValue; 
-            
+
+            double chance = channelValue * prevValue * nextValue;
+
             probability -= Math.log(chance);
         }
         return probability;
     }
-    
 
     /**
      * Returns list of all possible corrected phrases for {@code phrase}. At
@@ -112,7 +104,7 @@ public class SpellCorrector {
                     } else { // is correction
                         possiblePhrases = getPossiblePhrases(remainingPhrase, similarWords, correctionsLeft - 1, true);
                     }
-                    
+
                     return possiblePhrases.stream()
                     .map(remPhrase -> similarWord + " " + String.join(" ", remPhrase));
                 })
