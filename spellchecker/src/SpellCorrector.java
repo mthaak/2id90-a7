@@ -7,20 +7,20 @@ import java.util.stream.Collectors;
 public class SpellCorrector {
 
     final private CorpusReader cr;
+    final private ConfusionMatrixReader cmr;
 
     public SpellCorrector(CorpusReader cr, ConfusionMatrixReader cmr) {
         this.cr = cr;
+        this.cmr = cmr;
     }
 
-    final private int LAMBDA = 4;
-    private final double NO_ERROR = 0.97;
+    final private double LAMBDA = 1; // importance confusion matrix
+    private final double NO_ERROR = 0.90; // probability no mistake in word
 
     public String correctPhrase(String phrase) {
         if (phrase == null || phrase.length() == 0) {
-            throw new IllegalArgumentException("phrase must be non-empty.");
+            throw new IllegalArgumentException("Phrase must be non-empty.");
         }
-
-        cr.determineCountFrequencies();
 
         List<String> words = Arrays.asList(phrase.split(" "));
 
@@ -29,53 +29,52 @@ public class SpellCorrector {
 
         List<String> possiblePhrases = getPossiblePhrases(words, similarWordsPerWord, 2, false);
 
-        double bestProbability = Double.POSITIVE_INFINITY;
-        String bestSentence = "";
-
-        for (String sentence : possiblePhrases) {
-            double probability = calculateProbabilityForSentence(sentence, phrase);
-            if (probability <= bestProbability) {
+        double bestProbability = Double.NEGATIVE_INFINITY;
+        String bestPhrase = "";
+        for (String possiblePhrase : possiblePhrases) {
+            double probability = calculateProbabilityCorrectedPhrase(phrase, possiblePhrase);
+            if (probability > bestProbability) {
                 bestProbability = probability;
-                bestSentence = sentence;
+                bestPhrase = possiblePhrase;
             }
         }
 
-        return bestSentence;
+        return bestPhrase;
     }
 
-    private double calculateProbabilityForSentence(String sentence, String originalSentence) {
-        String[] words = sentence.split(" ");
-        String[] originalWords = originalSentence.split(" ");
+    private double calculateProbabilityCorrectedPhrase(String originalPhrase, String correctedPhrase) {
+        String[] originalWords = originalPhrase.split(" ");
+        String[] correctedWords = correctedPhrase.split(" ");
 
-        // How to do confusionValue?
-        // How to no_error
-        double probability = 0.0;
-
-        for (int i = 0; i < words.length; i++) {
-            String prevWord = i > 0 ? words[i - 1] : "<s>";
-            String word = words[i];
+        double probability = 0;
+        for (int i = 0; i < correctedWords.length; i++) {
             String originalWord = originalWords[i];
-            String nextWord = i < words.length - 1 ? words[i + 1] : "</s>";
+            String correctedWord = correctedWords[i];
 
-            double prevValue = cr.getProbabiltyGivenPrev(word, prevWord);
-            double nextValue = cr.getProbabilityGivenNext(word, nextWord);
-
-            double wordValue = cr.getProbability(word);
-            double originalWordValue = cr.getProbability(originalWord);
-
-            double channelValue;
-            double confusionValue = 0.0;
-            if (word.equals(originalWord)) {
-                channelValue = NO_ERROR;
-            } else {
-                confusionValue = cr.getConfusionValue(word, originalWord);
-                channelValue = wordValue * Math.pow(confusionValue, LAMBDA);// / originalWordValue;
+            double prevValue = 1.0;
+            if (i > 0) {
+                prevValue = cr.getProbabiltyGivenPrev(correctedWord, correctedWords[i - 1]);
+            }
+            double nextValue = 1.0;
+            if (i < correctedWords.length - 1) {
+                nextValue = cr.getProbabilityGivenNext(correctedWord, correctedWords[i + 1]);
             }
 
-            double chance = channelValue * prevValue * nextValue;
+            double correctedWordProbability = cr.getProbability(correctedWord);
 
-            probability -= Math.log(chance);
+            double noisyChannelValue;
+            if (correctedWord.equals(originalWord)) {
+                noisyChannelValue = NO_ERROR;
+            } else {
+                double correctionProbability = cmr.getProbabilityCorrection(originalWord, correctedWord);
+                noisyChannelValue = correctedWordProbability * Math.pow(correctionProbability, LAMBDA);
+            }
+
+            double chance = noisyChannelValue * prevValue * nextValue;
+
+            probability += Math.log(chance);
         }
+
         return probability;
     }
 
@@ -92,7 +91,6 @@ public class SpellCorrector {
 
         // STEP
         String firstWord = phrase.get(0);
-        //System.out.println("firstWord: " + firstWord + ", phrase: " + phrase.toString());
         return similarWords.get(firstWord).stream()
                 .filter(similarWord -> (similarWord.equals(firstWord) || (correctionsLeft > 0 && !prevWasCorrection)))
                 .flatMap(similarWord -> {
