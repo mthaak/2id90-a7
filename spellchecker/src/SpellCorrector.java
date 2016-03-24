@@ -1,4 +1,5 @@
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,7 +25,9 @@ public class SpellCorrector {
 
         List<String> words = Arrays.asList(phrase.split(" "));
 
-        Map<String, Set<String>> similarWordsPerWord = words.stream()
+        // To prevent duplicates
+        Set<String> wordsAsSet = new HashSet(words);
+        Map<String, Set<String>> similarWordsPerWord = wordsAsSet.stream()
                 .collect(Collectors.toMap(word -> word, word -> getSimilarWords(word)));
 
         List<String> possiblePhrases = getPossiblePhrases(words, similarWordsPerWord, 2, false);
@@ -39,7 +42,7 @@ public class SpellCorrector {
             }
         }
 
-        return bestPhrase;
+        return bestPhrase.trim();
     }
 
     private double calculateProbabilityCorrectedPhrase(String originalPhrase, String correctedPhrase) {
@@ -91,11 +94,10 @@ public class SpellCorrector {
 
         // STEP
         String firstWord = phrase.get(0);
+        List<String> remainingPhrase = phrase.subList(1, phrase.size());
         return similarWords.get(firstWord).stream()
                 .filter(similarWord -> (similarWord.equals(firstWord) || (correctionsLeft > 0 && !prevWasCorrection)))
-                .flatMap(similarWord -> {
-                    List<String> remainingPhrase = phrase.subList(1, phrase.size());
-
+                .flatMap(similarWord -> {    
                     List<String> possiblePhrases;
                     if (similarWord.equals(firstWord)) { // is same word
                         possiblePhrases = getPossiblePhrases(remainingPhrase, similarWords, correctionsLeft, false);
@@ -104,7 +106,7 @@ public class SpellCorrector {
                     }
 
                     return possiblePhrases.stream()
-                    .map(remPhrase -> similarWord + " " + String.join(" ", remPhrase));
+                    .map(possiblePhrase -> similarWord + " " + String.join(" ", possiblePhrase));
                 })
                 .collect(Collectors.toList());
     }

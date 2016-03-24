@@ -126,6 +126,7 @@ public class CorpusReader {
 
         // Add-K smoothing
         double probability = (countBigram + K) / (countNextWord + K * V);
+//        double probability = countBigram/ countNextWord;
 
         return probability;
     }
@@ -141,7 +142,8 @@ public class CorpusReader {
 
         // Add-K smoothing
         double probability = (countBigram + K) / (countPrevWord + K * V);
-
+//        double probability = countBigram/ countPrevWord;
+        
         return probability;
     }
 
