@@ -15,7 +15,7 @@ public class SpellCorrector {
         this.cmr = cmr;
     }
 
-    final private double LAMBDA = 1; // importance confusion matrix
+    final private double LAMBDA = 0.35; // importance confusion matrix
     private final double NO_ERROR = 0.90; // probability no mistake in word
 
     public String correctPhrase(String phrase) {
@@ -74,7 +74,7 @@ public class SpellCorrector {
             }
 
             double chance = noisyChannelValue * prevValue * nextValue;
-
+            
             probability += Math.log(chance);
         }
 

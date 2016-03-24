@@ -19,7 +19,7 @@ public class CorpusReader {
     private Set<String> vocabulary;
     private HashMap<Integer, Integer> nGramCountFrequencies;
 
-    final static int K = 250;
+    final static double K = 0.005;
     private int maxCount;
 
     public CorpusReader() throws IOException {
@@ -120,7 +120,8 @@ public class CorpusReader {
             throw new IllegalArgumentException("NGrams must be non-empty.");
         }
 
-        double countBigram = getGoodTuringSmoothedCount(word + " " + nextWord);
+        //double countBigram = getGoodTuringSmoothedCount(word + " " + nextWord);
+        double countBigram = getNGramCount(word + " " + nextWord);
         int countNextWord = getNGramCount(nextWord);
         double V = getVocabularySize();
 
@@ -136,7 +137,8 @@ public class CorpusReader {
             throw new IllegalArgumentException("NGrams must be non-empty.");
         }
 
-        double countBigram = getGoodTuringSmoothedCount(prevWord + " " + word);
+        //double countBigram = getGoodTuringSmoothedCount(prevWord + " " + word);
+        double countBigram = getNGramCount(prevWord + " " + word);
         int countPrevWord = getNGramCount(prevWord);
         double V = getVocabularySize();
 
@@ -155,7 +157,8 @@ public class CorpusReader {
         } else {
             int c = this.ngrams.get(ngram);
             if (c < this.maxCount) {
-                return (c + 1) * (this.nGramCountFrequencies.get(c + 1) / (this.nGramCountFrequencies.get(c) * N));
+                return (c + 1) * (this.nGramCountFrequencies.get(c + 1) / 
+                        (this.nGramCountFrequencies.get(c) * N));
             } else {
                 return c / N;
             }
