@@ -52,6 +52,8 @@ public class SpellChecker {
             }
     }
     
+    private final static boolean DEBUG = false;
+    
     static void peachTraining(SpellCorrector sc) throws IOException { 
             String[] sentences = {
                 "this assay allowed us to measure a wide variety of conitions",
@@ -81,7 +83,7 @@ public class SpellChecker {
                 "this advices is taking into consideration the fact that the government bans political parties",
                 "this addvice is taking into consideration the fact that the goverment bans political parties",
                 "ancient china was one of the longst lasting societies iin the history of the world",
-                "ancient china was one of the longest lasting sosieties in the history of the wor",
+                "ancient china was one of the longest lasting sosieties in the history of the world",
                 "anicent china was one of the longest lasting societties in the history of the world",
                 "ancient china wqs one of the longest lasting societies in the histori of the world",
                 "laying in the national footbal league was my dream",
@@ -125,15 +127,23 @@ public class SpellChecker {
                 "Answer: playing in the national football league was my dream"
             };
             
-            System.out.println(sentences.length + " " + correctSentences.length);
-            
             int correctPhrases = 0;
             int totalPhrases = 0;
             for (int i = 0; i < sentences.length; i ++) {
-                String result = sc.correctPhrase(sentences[i]);
+                String sentence = sentences[i];
+                String result = "Answer: " + sc.correctPhrase(sentence);
                 String correctResult = correctSentences[i];
+                
                 if (result.equals(correctResult)) {
                     correctPhrases ++;
+                } else  {
+                    if (DEBUG) {
+                        System.out.println("Test " + i);
+                        System.out.println("Sentence: " + sentence);
+                        System.out.println(result);
+                        System.out.println(correctResult);
+                        System.out.println("");
+                    }
                 }
                 totalPhrases ++;
             }
