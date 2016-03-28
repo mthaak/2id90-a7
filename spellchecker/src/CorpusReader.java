@@ -19,8 +19,8 @@ public class CorpusReader {
     private Set<String> vocabulary;
     private HashMap<Integer, Integer> nGramCountFrequencies;
 
-    final static int K = 250;
-    private int maxCount;
+    final static int K = 250; // used for Add-K smoothing
+    private int maxCount; // count until Good-Turing smoothing is used
 
     public CorpusReader() throws IOException {
         readNGrams();

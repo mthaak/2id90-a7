@@ -1,3 +1,4 @@
+
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -63,15 +64,20 @@ public class ConfusionMatrixReader {
         return count == null ? 0 : count;
     }
 
+    /**
+     * Compares two words to find the correction in the form <error>|<correct>,
+     * e.g. "ng|n".
+     */
     public String getCorrection(String originalWord, String correctedWord) {
         // Space is seen as character in the confusion matrix
         originalWord = " " + originalWord;
         correctedWord = " " + correctedWord;
 
+        // Iterate until ends of both words are reached
         int endIndex = max(originalWord.length(), correctedWord.length());
         for (int i = 1; i < endIndex; i++) {
             if ((i == endIndex - 1 && originalWord.length() != correctedWord.length())
-                    || originalWord.charAt(i) != correctedWord.charAt(i)) { // correction
+                    || originalWord.charAt(i) != correctedWord.charAt(i)) { // there is a difference
 
                 if (originalWord.length() == correctedWord.length()) { // transposition or substitution
 
@@ -90,18 +96,25 @@ public class ConfusionMatrixReader {
             }
         }
 
-        return ""; // doesn't matter
+        return ""; // doesn't matter since only different words are compared
     }
 
+    /**
+     * Returns the probability that the intended word for originalWord is
+     * correctedWord using a confusion matrix.
+     */
     public double getProbabilityCorrection(String originalWord, String correctedWord) {
+        // Get correction, e.g. "ng|g"
         String correction = getCorrection(originalWord, correctedWord);
+        // Get count from confusion matrix
         Integer correctionCount = confusionMatrix.get(correction);
 
-        // Essentially Add-One smoothing
+        // Essentially Add-One smoothing to prevent zero-probablity problem
         if (correctionCount == null) {
             correctionCount = 1;
         }
 
+        // Return probability
         return (double) correctionCount / totalConfusionMatrix;
     }
 }
