@@ -1,3 +1,4 @@
+
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -19,13 +20,13 @@ public class CorpusReader {
     private Set<String> vocabulary;
     private HashMap<Integer, Integer> nGramCountFrequencies;
 
-    final static double K = 0.005;
-    private int maxCount;
+    final static double K = 0.005; // used for Add-K smoothing
+    private int maxCount; // used for Good-Turing smoothing
 
     public CorpusReader() throws IOException {
         readNGrams();
         readVocabulary();
-        determineNGramCountFrequencies();
+//        determineNGramCountFrequencies();
     }
 
     private void readNGrams() throws
@@ -66,11 +67,16 @@ public class CorpusReader {
         }
     }
 
+    /**
+     * Calculate frequencies of counts beforehand. Used for Good-Turing
+     * smoothing.
+     */
     private void determineNGramCountFrequencies() {
         this.nGramCountFrequencies = new HashMap<>();
 
         List<Integer> counts = new ArrayList<>(this.ngrams.values());
         int i;
+        // For all counts get frequency 
         for (i = 1; counts.contains(i); i++) {
             this.nGramCountFrequencies.put(i, Collections.frequency(counts, i));
         }
@@ -115,13 +121,18 @@ public class CorpusReader {
         return count / V;
     }
 
+    /**
+     * Gets probability of word given next word. Uses Add-K Smoothing only.
+     */
     public double getProbabilityGivenNext(String word, String nextWord) {
         if (word == null || word.length() == 0 || nextWord == null || nextWord.length() == 0) {
             throw new IllegalArgumentException("NGrams must be non-empty.");
         }
 
         //double countBigram = getGoodTuringSmoothedCount(word + " " + nextWord);
+        // Get bigram count from vocabulary
         double countBigram = getNGramCount(word + " " + nextWord);
+        // Get next word count
         int countNextWord = getNGramCount(nextWord);
         double V = getVocabularySize();
 
@@ -132,34 +143,43 @@ public class CorpusReader {
         return probability;
     }
 
+    /**
+     * Gets probability of word given previous word. Uses Add-K Smoothing only.
+     */
     public double getProbabiltyGivenPrev(String word, String prevWord) {
         if (word == null || word.length() == 0 || prevWord == null || prevWord.length() == 0) {
             throw new IllegalArgumentException("NGrams must be non-empty.");
         }
 
         //double countBigram = getGoodTuringSmoothedCount(prevWord + " " + word);
+        // Get bigram count from vocabulary
         double countBigram = getNGramCount(prevWord + " " + word);
+        // Get previous word count
         int countPrevWord = getNGramCount(prevWord);
         double V = getVocabularySize();
 
         // Add-K smoothing
         double probability = (countBigram + K) / (countPrevWord + K * V);
 //        double probability = countBigram/ countPrevWord;
-        
+
         return probability;
     }
 
+    /**
+     * Good-Turing smoothing. -- NOT USED!
+     */
     private int getGoodTuringSmoothedCount(String ngram) {
         int N = this.ngrams.size();
 
+        // If bigram not contained in vocabulary, use frequency for a bigram with count 1
         if (!this.ngrams.containsKey(ngram) || this.ngrams.get(ngram) == 0) {
             return this.nGramCountFrequencies.get(1) / N;
-        } else {
+        } else { // For other bigrams with count > 0 use frequency of count + 1
             int c = this.ngrams.get(ngram);
-            if (c < this.maxCount) {
-                return (c + 1) * (this.nGramCountFrequencies.get(c + 1) / 
-                        (this.nGramCountFrequencies.get(c) * N));
-            } else {
+            if (c < this.maxCount) { // For some high bigram counts there is no frequency for count + 1
+                return (c + 1) * (this.nGramCountFrequencies.get(c + 1)
+                        / (this.nGramCountFrequencies.get(c) * N));
+            } else { // use normal probability
                 return c / N;
             }
         }
